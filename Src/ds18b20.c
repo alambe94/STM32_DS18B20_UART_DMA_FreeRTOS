@@ -38,8 +38,8 @@
 #include "task.h"
 #include "semphr.h"
 
-extern UART_HandleTypeDef huart3;
-#define DS18B20_HALF_DUPLEX_UART huart3
+extern UART_HandleTypeDef huart4;
+#define DS18B20_HALF_DUPLEX_UART huart4
 
 /****ds18b20 thread data*/
 
@@ -52,6 +52,22 @@ static void  DS18B20_Task(void* argument);
 
 SemaphoreHandle_t DS18B20_Mutex_Handle;
 StaticSemaphore_t DS18B20_Mutex_Buffer;
+
+extern TaskHandle_t Main_Task_Handle;
+
+
+
+#define QUEUE_LENGTH    1
+#define ITEM_SIZE       sizeof( uint16_t )
+
+/* The variable used to hold the queue's data structure. */
+static StaticQueue_t xStaticQueue;
+
+QueueHandle_t DS18B20_Q;
+
+/* The array to use as the queue's storage area.  This must be at least
+uxQueueLength * uxItemSize bytes. */
+uint8_t ucQueueStorageArea[ QUEUE_LENGTH * ITEM_SIZE ];
 
 /****ds18b20 thread data*/
 
@@ -69,6 +85,45 @@ StaticSemaphore_t DS18B20_Mutex_Buffer;
 #define DS18B20_READ_RAM              0xBE  /* 0b10111110  */
 #define DS18B20_WRITE_RAM             0x4E  /* 0b01001110  */
 
+uint8_t DS18B20_Scrach_Pad[9];
+
+/*Maxim APPLICATION NOTE 27 */
+
+const uint8_t DS18B20_CRC_Table[] =
+	{
+	0, 94, 188, 226, 97, 63, 221, 131, 194, 156, 126, 32, 163, 253, 31, 65,
+	157, 195, 33, 127, 252, 162, 64, 30, 95, 1, 227, 189, 62, 96, 130, 220,
+	35, 125, 159, 193, 66, 28, 254, 160, 225, 191, 93, 3, 128, 222, 60, 98,
+	190, 224, 2, 92, 223, 129, 99, 61, 124, 34, 192, 158, 29, 67, 161, 255,
+	70, 24, 250, 164, 39, 121, 155, 197, 132, 218, 56, 102, 229, 187, 89, 7,
+	219, 133, 103, 57, 186, 228, 6, 88, 25, 71, 165, 251, 120, 38, 196, 154,
+	101, 59, 217, 135, 4, 90, 184, 230, 167, 249, 27, 69, 198, 152, 122, 36,
+	248, 166, 68, 26, 153, 199, 37, 123, 58, 100, 134, 216, 91, 5, 231, 185,
+	140, 210, 48, 110, 237, 179, 81, 15, 78, 16, 242, 172, 47, 113, 147, 205,
+	17, 79, 173, 243, 112, 46, 204, 146, 211, 141, 111, 49, 178, 236, 14, 80,
+	175, 241, 19, 77, 206, 144, 114, 44, 109, 51, 209, 143, 12, 82, 176, 238,
+	50, 108, 142, 208, 83, 13, 239, 177, 240, 174, 76, 18, 145, 207, 45, 115,
+	202, 148, 118, 40, 171, 245, 23, 73, 8, 86, 180, 234, 105, 55, 213, 139,
+	87, 9, 235, 181, 54, 104, 138, 212, 149, 203, 41, 119, 244, 170, 72, 22,
+	233, 183, 85, 11, 136, 214, 52, 106, 43, 117, 151, 201, 74, 20, 246, 168,
+	116, 42, 200, 150, 21, 75, 169, 247, 182, 232, 10, 84, 215, 137, 107, 53
+	};
+
+uint8_t DS18B20_CRC(uint8_t* data, uint8_t len)
+    {
+
+    uint8_t crc = 0;
+
+    for(uint8_t i=0; i<len; i++)
+	{
+	crc = DS18B20_CRC_Table[crc^ data[i]];
+	}
+
+    return crc;
+    }
+
+
+
 /**
  * @brief   Temperature convert, {Skip ROM = 0xCC, Convert = 0x44}
  */
@@ -83,16 +138,29 @@ static const uint8_t Temp_Convert_CMD[] =
  */
 static const uint8_t Temp_Read_CMD[] =
     {
-    BIT_0, BIT_0, BIT_1, BIT_1, BIT_0, BIT_0, BIT_1, BIT_1,
-    BIT_0, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_0, BIT_1,
-    BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1,
-    BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1
+    BIT_0, BIT_0, BIT_1, BIT_1, BIT_0, BIT_0, BIT_1, BIT_1, // Skip ROM = 0xCC
+    BIT_0, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_0, BIT_1, // Scratch read = 0xBE
+
+    BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, // Temperature LSB
+    BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, // Temperature MSB
+
+    BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, // TH
+    BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, // TL
+
+    BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, // CFG
+
+    BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, // Reserved
+    BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, // Reserved
+    BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, // Reserved
+
+    BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1  // CRC
     };
 
 /**
  * @brief   Received temperature data using DMA
  */
-static uint8_t Temperature_Data[sizeof(Temp_Read_CMD)];
+static uint8_t RX_DMA_Buffer[sizeof(Temp_Read_CMD)];
+
 
 /**
  * @brief   Current temperature value in degree celsius
@@ -214,6 +282,11 @@ void DS18B20_Thread_Add()
     DS18B20_Mutex_Handle = xSemaphoreCreateMutexStatic(&DS18B20_Mutex_Buffer);
     xSemaphoreGive(DS18B20_Mutex_Handle);
 
+    DS18B20_Q = xQueueCreateStatic(QUEUE_LENGTH,
+	    ITEM_SIZE,
+	    ucQueueStorageArea,
+	    &xStaticQueue);
+
     DS18B20_Task_Handle = xTaskCreateStatic(DS18B20_Task,
 	    "DS18B20_Task",
 	    DS18B20_TASK_STACK_SIZE,
@@ -247,13 +320,13 @@ static void DS18B20_Task(void* argument)
 	    DS18B20_Send_Buffer(Temp_Convert_CMD, sizeof(Temp_Convert_CMD));
 
 	    /* Wait conversion time */
-	    vTaskDelay(1000);
+	    vTaskDelay(750);
 
 	    /* Send reset pulse */
 	    DS18B20_Send_Reset();
 
 	    /* Enable temperature data reception with DMA */
-	    DS18B20_Receive_Buffer(Temperature_Data, sizeof(Temperature_Data));
+	    DS18B20_Receive_Buffer(RX_DMA_Buffer, sizeof(RX_DMA_Buffer));
 
 	    /* Send temperature read command */
 	    DS18B20_Send_Buffer(Temp_Read_CMD, sizeof(Temp_Read_CMD));
@@ -261,29 +334,53 @@ static void DS18B20_Task(void* argument)
 	    /* Wait until DMA receive temperature data */
 	    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
-	    /* Temporarily variable for extracting temperature data */
-	    uint16_t temperature = 0;
-
-	    /* Extract new temperature data */
-	    for (int idx = 16; idx < 32; idx++)
+	    /* Assemble DS18B20_Scrach_Pad from  RX_DMA_Buffer */
+	    for (uint8_t i = 0; i < 9; i++)
 		{
-		if (BIT_1 == Temperature_Data[idx])
+
+		uint8_t temp = 0;
+
+		for (uint8_t j = 0; j < 8; j++)
 		    {
-		    /* Bit value is 1 */
-		    temperature = (temperature >> 1) | 0x8000;
+
+		    temp = temp >> 1;
+
+		    if (BIT_1 == RX_DMA_Buffer[j + 16 + (i * 8)])
+			{
+			/* Bit value is 1 */
+			temp |= 0x80;
+			}
+
 		    }
-		else
-		    {
-		    /* Bit value is 0 */
-		    temperature = temperature >> 1;
-		    }
+
+		DS18B20_Scrach_Pad[i] = temp;
+
 		}
 
-	    /* Copying new temperature data and divide by 16 for fraction part */
-	    Current_Temperature = (float) temperature / (float) 16;
+	    /* calculate crc */
+	    uint8_t crc = DS18B20_CRC(DS18B20_Scrach_Pad, 8);
 
-	    /**** notify other tasks **/
-	    /**** send temperature via queue**/
+	    /* if crc matched, data is valid*/
+	    if (crc == DS18B20_Scrach_Pad[8])
+		{
+		/* Temporarily variable for extracting temperature data */
+		uint16_t temperature = 0;
+
+		temperature = DS18B20_Scrach_Pad[0]
+			| DS18B20_Scrach_Pad[1] << 8;
+
+		/* Send an temperature.  Wait for 100 ticks for space to become
+		 available if necessary. */
+		if ( xQueueSend( DS18B20_Q,
+			( void * ) &temperature,
+			( TickType_t ) 100 ) != pdPASS)
+		    {
+		    /* Failed to post the message, even after 10 ticks. */
+		    }
+
+		/* Copying new temperature data and divide by 16 for fraction part */
+		Current_Temperature = (float) temperature / (float) 16;
+		}
 
 	    }
 	else

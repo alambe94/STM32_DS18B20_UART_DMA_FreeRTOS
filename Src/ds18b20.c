@@ -44,11 +44,13 @@ extern UART_HandleTypeDef huart4;
 /****ds18b20 thread data*/
 
 #define      DS18B20_TASK_STACK_SIZE 256u
-#define      DS18B20_TASK_PRIORITY   7u
+#define      DS18B20_TASK_PRIORITY   5u
 TaskHandle_t DS18B20_Task_Handle;
 StackType_t  DS18B20_Task_Stack[DS18B20_TASK_STACK_SIZE];
 StaticTask_t DS18B20_Task_TCB;
 static void  DS18B20_Task(void* argument);
+
+/* only if accessing one wire port from more than one task */
 
 SemaphoreHandle_t DS18B20_Mutex_Handle;
 StaticSemaphore_t DS18B20_Mutex_Buffer;
@@ -85,11 +87,11 @@ uint8_t ucQueueStorageArea[ QUEUE_LENGTH * ITEM_SIZE ];
 #define DS18B20_READ_RAM              0xBE  /* 0b10111110  */
 #define DS18B20_WRITE_RAM             0x4E  /* 0b01001110  */
 
-uint8_t DS18B20_Scrach_Pad[9];
+static uint8_t DS18B20_Scrach_Pad[9];
 
 /*Maxim APPLICATION NOTE 27 */
 
-const uint8_t DS18B20_CRC_Table[] =
+static const uint8_t DS18B20_CRC_Table[] =
 	{
 	0, 94, 188, 226, 97, 63, 221, 131, 194, 156, 126, 32, 163, 253, 31, 65,
 	157, 195, 33, 127, 252, 162, 64, 30, 95, 1, 227, 189, 62, 96, 130, 220,
@@ -118,10 +120,8 @@ uint8_t DS18B20_CRC(uint8_t* data, uint8_t len)
 	{
 	crc = DS18B20_CRC_Table[crc^ data[i]];
 	}
-
     return crc;
     }
-
 
 
 /**
@@ -134,9 +134,9 @@ static const uint8_t Temp_Convert_CMD[] =
     };
 
 /**
- * @brief   Temperature data read, {Skip ROM = 0xCC, Scratch read = 0xBE}
+ * @brief   Scratch data read, {Skip ROM = 0xCC, Scratch read = 0xBE}
  */
-static const uint8_t Temp_Read_CMD[] =
+static const uint8_t TX_DMA_Buffer[] =
     {
     BIT_0, BIT_0, BIT_1, BIT_1, BIT_0, BIT_0, BIT_1, BIT_1, // Skip ROM = 0xCC
     BIT_0, BIT_1, BIT_1, BIT_1, BIT_1, BIT_1, BIT_0, BIT_1, // Scratch read = 0xBE
@@ -159,7 +159,7 @@ static const uint8_t Temp_Read_CMD[] =
 /**
  * @brief   Received temperature data using DMA
  */
-static uint8_t RX_DMA_Buffer[sizeof(Temp_Read_CMD)];
+static uint8_t RX_DMA_Buffer[sizeof(TX_DMA_Buffer)];
 
 
 /**
@@ -329,7 +329,7 @@ static void DS18B20_Task(void* argument)
 	    DS18B20_Receive_Buffer(RX_DMA_Buffer, sizeof(RX_DMA_Buffer));
 
 	    /* Send temperature read command */
-	    DS18B20_Send_Buffer(Temp_Read_CMD, sizeof(Temp_Read_CMD));
+	    DS18B20_Send_Buffer(TX_DMA_Buffer, sizeof(TX_DMA_Buffer));
 
 	    /* Wait until DMA receive temperature data */
 	    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
@@ -360,7 +360,7 @@ static void DS18B20_Task(void* argument)
 	    /* calculate crc */
 	    uint8_t crc = DS18B20_CRC(DS18B20_Scrach_Pad, 8);
 
-	    /* if crc matched, data is valid*/
+	    /* if crc matched data is valid*/
 	    if (crc == DS18B20_Scrach_Pad[8])
 		{
 		/* Temporarily variable for extracting temperature data */
@@ -369,11 +369,11 @@ static void DS18B20_Task(void* argument)
 		temperature = DS18B20_Scrach_Pad[0]
 			| DS18B20_Scrach_Pad[1] << 8;
 
-		/* Send an temperature.  Wait for 100 ticks for space to become
+		/* Send an temperature.  Wait for 0 ticks for space to become
 		 available if necessary. */
 		if ( xQueueSend( DS18B20_Q,
 			( void * ) &temperature,
-			( TickType_t ) 100 ) != pdPASS)
+			( TickType_t ) 0 ) != pdPASS)
 		    {
 		    /* Failed to post the message, even after 10 ticks. */
 		    }

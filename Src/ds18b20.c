@@ -325,16 +325,16 @@ static void DS18B20_Task(void* argument)
 	    /* Send reset pulse */
 	    DS18B20_Send_Reset();
 
-	    /* Enable temperature data reception with DMA */
+	    /* Enable data reception with DMA */
 	    DS18B20_Receive_Buffer(RX_DMA_Buffer, sizeof(RX_DMA_Buffer));
 
-	    /* Send temperature read command */
+	    /* Send scratch pad data read command */
 	    DS18B20_Send_Buffer(TX_DMA_Buffer, sizeof(TX_DMA_Buffer));
 
-	    /* Wait until DMA receive temperature data */
+	    /* Wait until DMA receive scratch pad data */
 	    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
-	    /* Assemble DS18B20_Scrach_Pad from  RX_DMA_Buffer */
+	    /* Assemble DS18B20_Scrach Pad from  RX_DMA_Buffer */
 	    for (uint8_t i = 0; i < 9; i++)
 		{
 

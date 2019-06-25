@@ -369,13 +369,13 @@ static void DS18B20_Task(void* argument)
 		temperature = DS18B20_Scrach_Pad[0]
 			| DS18B20_Scrach_Pad[1] << 8;
 
-		/* Send an temperature.  Wait for 0 ticks for space to become
+		/* Send temperature.  Wait for -- ticks for space to become
 		 available if necessary. */
 		if ( xQueueSend( DS18B20_Q,
 			( void * ) &temperature,
 			( TickType_t ) 0 ) != pdPASS)
 		    {
-		    /* Failed to post the message, even after 10 ticks. */
+		    /* Failed to post the message, even after -- ticks. */
 		    }
 
 		/* Copying new temperature data and divide by 16 for fraction part */

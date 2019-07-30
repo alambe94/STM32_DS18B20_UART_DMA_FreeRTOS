@@ -42,7 +42,7 @@
 TaskHandle_t Blinky_Task_Handle;
 StackType_t  Blinky_Task_Stack[BLINKY_TASK_STACK_SIZE];
 StaticTask_t Blinky_Task_TCB;
-static void  Blinky_Task(void* argument);
+static void  Blinky_Task();
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -68,7 +68,7 @@ extern void Print_Thread_Add();
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void Blinky_Task(void* argument)
+void Blinky_Task()
     {
 
     while(1)

@@ -28,11 +28,11 @@ void Print_Thread_Add()
     {
 
     OS_ERR os_err;
-
+/*
     OSMutexCreate((OS_MUTEX*) &UART_Mutex_Handle,
 	    (CPU_CHAR*) "UART_Mutex",
 	    (OS_ERR*) &os_err);
-
+*/
     OSTaskCreate(&Print_Task_TCB,
 	    "Print_Task",
 	    Print_Task,
@@ -62,7 +62,7 @@ void CLI_UART_Send_String(const char* data)
     OS_ERR os_err;
 
     /*** gaurd uart ***/
-    OSMutexPend(&UART_Mutex_Handle, 0, OS_OPT_PEND_BLOCKING, 0, &os_err);
+    //OSMutexPend(&UART_Mutex_Handle, 0, OS_OPT_PEND_BLOCKING, 0, &os_err);
 
     uint16_t count = 0;
     while (*data)
@@ -72,7 +72,7 @@ void CLI_UART_Send_String(const char* data)
 	}
 
     /*** release uart ***/
-    OSMutexPost(&UART_Mutex_Handle, OS_OPT_POST_NONE, &os_err);
+    //OSMutexPost(&UART_Mutex_Handle, OS_OPT_POST_NONE, &os_err);
     }
 
 void CLI_UART_Send_String_DMA(const char* data)

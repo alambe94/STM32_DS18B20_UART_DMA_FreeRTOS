@@ -34,38 +34,31 @@
 /* Includes */
 #include "ds18b20.h"
 #include "main.h"
-#include "FreeRTOS.h"
-#include "task.h"
-#include "semphr.h"
+#include "RTOS.h"
 
 extern UART_HandleTypeDef huart6;
 #define DS18B20_HALF_DUPLEX_UART huart6
 
 /****ds18b20 thread data*/
 
-#define      DS18B20_TASK_STACK_SIZE 256u
-#define      DS18B20_TASK_PRIORITY   5u
-TaskHandle_t DS18B20_Task_Handle;
-StackType_t  DS18B20_Task_Stack[DS18B20_TASK_STACK_SIZE];
-StaticTask_t DS18B20_Task_TCB;
-static void  DS18B20_Task();
+#define              DS18B20_TASK_STACK_SIZE 256u
+#define              DS18B20_TASK_PRIORITY   4u
+OS_STACKPTR int      DS18B20_Task_Stack[DS18B20_TASK_STACK_SIZE];
+OS_TASK              DS18B20_Task_TCB;
+static void          DS18B20_Task(void* argument);
 
 /* only if accessing one wire port from more than one task */
 
-SemaphoreHandle_t DS18B20_Mutex_Handle;
-StaticSemaphore_t DS18B20_Mutex_Buffer;
-
-extern TaskHandle_t Main_Task_Handle;
-
-
+OS_MUTEX      DS18B20_Mutex_Handle;
+OS_SEMAPHORE  DS18B20_SYNC_SEM;
+OS_QUEUE      DS18B20_Q;
 
 #define QUEUE_LENGTH    1
 #define ITEM_SIZE       sizeof( uint16_t )
 
 /* The variable used to hold the queue's data structure. */
-static StaticQueue_t xStaticQueue;
 
-QueueHandle_t DS18B20_Q;
+
 
 /* The array to use as the queue's storage area.  This must be at least
 uxQueueLength * uxItemSize bytes. */
@@ -279,23 +272,16 @@ static uint8_t DS18B20_Send_Reset(void)
 void DS18B20_Thread_Add()
     {
 
-    DS18B20_Mutex_Handle = xSemaphoreCreateMutexStatic(&DS18B20_Mutex_Buffer);
+        OS_MUTEX_Create(&DS18B20_Mutex_Handle);
 
-    DS18B20_Q = xQueueCreateStatic(QUEUE_LENGTH,
-	    ITEM_SIZE,
-	    ucQueueStorageArea,
-	    &xStaticQueue);
+        OS_TASK_CREATE(&DS18B20_Task_TCB, "DS18B20_Task", 100, DS18B20_Task, DS18B20_Task_Stack);
 
-    DS18B20_Task_Handle = xTaskCreateStatic(DS18B20_Task,
-	    "DS18B20_Task",
-	    DS18B20_TASK_STACK_SIZE,
-	    NULL,
-	    DS18B20_TASK_PRIORITY,
-	    DS18B20_Task_Stack,
-	    &DS18B20_Task_TCB);
+        OS_SEMAPHORE_Create(&DS18B20_SYNC_SEM, 1);
+
+        OS_QUEUE_Create(&DS18B20_Q, ucQueueStorageArea, QUEUE_LENGTH);
     }
 
-static void DS18B20_Task()
+static void DS18B20_Task(void* argument)
     {
 
     DS18B20_GPIO_Init();
@@ -305,6 +291,7 @@ static void DS18B20_Task()
 
     while (1)
 	{
+
 	/* Sensor detected flag */
 	uint8_t isSensorDetected = 0;
 
@@ -319,7 +306,7 @@ static void DS18B20_Task()
 	    DS18B20_Send_Buffer(Temp_Convert_CMD, sizeof(Temp_Convert_CMD));
 
 	    /* Wait conversion time */
-	    vTaskDelay(750);
+	    OS_Delay(750);
 
 	    /* Send reset pulse */
 	    DS18B20_Send_Reset();
@@ -331,7 +318,7 @@ static void DS18B20_Task()
 	    DS18B20_Send_Buffer(TX_DMA_Buffer, sizeof(TX_DMA_Buffer));
 
 	    /* Wait until DMA receive scratch pad data */
-	    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+	    OS_SEMAPHORE_TakeBlocked(&DS18B20_SYNC_SEM);
 
 	    /* Assemble DS18B20_Scrach Pad from  RX_DMA_Buffer */
 	    for (uint8_t i = 0; i < 9; i++)
@@ -368,14 +355,8 @@ static void DS18B20_Task()
 		temperature = DS18B20_Scrach_Pad[0]
 			| DS18B20_Scrach_Pad[1] << 8;
 
-		/* Send temperature.  Wait for -- ticks for space to become
-		 available if necessary. */
-		if ( xQueueSend( DS18B20_Q,
-			( void * ) &temperature,
-			( TickType_t ) 0 ) != pdPASS)
-		    {
-		    /* Failed to post the message, even after -- ticks. */
-		    }
+		/* Send temperature. */
+		OS_QUEUE_Put(&DS18B20_Q, &temperature, QUEUE_LENGTH);
 
 		/* Copying new temperature data and divide by 16 for fraction part */
 		Current_Temperature = (float) temperature / (float) 16;
@@ -386,7 +367,7 @@ static void DS18B20_Task()
 	    {
 	    /* Temperature data not valid */
 	    Current_Temperature = 0;
-	    vTaskDelay(1000);
+	    OS_Delay(1000);
 	    }
 	}
     }
@@ -409,14 +390,12 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
  * @retval  None
  */
 
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-    {
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
-    if (huart == &DS18B20_HALF_DUPLEX_UART)
-	{
-	BaseType_t xHigherPriorityTaskWoken;
-	vTaskNotifyGiveFromISR(DS18B20_Task_Handle, &xHigherPriorityTaskWoken);
-	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+	if (huart == &DS18B20_HALF_DUPLEX_UART) {
+	    OS_EnterNestableInterrupt();
+	    OS_SEMAPHORE_Give(&DS18B20_SYNC_SEM);
+	    OS_LeaveNestableInterrupt();
 	}
-    }
+}
 

@@ -180,12 +180,15 @@ SECTIONS
   /* User_heap_stack section, used to check that there is enough "RAM" Ram  type memory left */
   ._user_heap_stack :
   {
-    . = ALIGN(8);
-    PROVIDE ( end = . );
-    PROVIDE ( _end = . );
+    . = ALIGN(4);
+    __heap_start__ = .;
     . = . + _Min_Heap_Size;
+    . = ALIGN(4);
+    __heap_end__ = .;
+    __stack_start__ = .;
     . = . + _Min_Stack_Size;
-    . = ALIGN(8);
+    . = ALIGN(4);
+    __stack_end__ = .;
   } >RAM
 
   /* Remove information from the compiler libraries */

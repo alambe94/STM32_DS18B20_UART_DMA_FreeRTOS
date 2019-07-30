@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cdtprojectproperties>
+<section name="org.eclipse.cdt.internal.ui.wizards.settingswizards.IncludePaths">
+<language name="s,S">
+
+</language>
+<language name="C Source File">
+<includepath>Inc</includepath>
+<includepath>Drivers/CMSIS/Include</includepath>
+<includepath>Drivers/STM32F4xx_HAL_Driver/Inc</includepath>
+<includepath>Drivers/CMSIS/Device/ST/STM32F4xx/Include</includepath>
+<includepath>Drivers/STM32F4xx_HAL_Driver/Inc/Legacy</includepath>
+<includepath>Micrium/BSP</includepath>
+<includepath>Micrium/Cfg</includepath>
+<includepath>Micrium/uC-CPU/ARM-Cortex-M4/GNU</includepath>
+<includepath>Micrium/uC-CPU</includepath>
+<includepath>Micrium/uC-LIB</includepath>
+<includepath>Micrium/uCOS-III/Ports/ARM-Cortex-M4/Generic/GNU</includepath>
+<includepath>Micrium/uCOS-III/Source</includepath>
+
+</language>
+<language name="Object File">
+
+</language>
+</section>
+<section name="org.eclipse.cdt.internal.ui.wizards.settingswizards.Macros">
+<language name="s,S">
+
+</language>
+<language name="C Source File">
+<macro>
+<name>USE_HAL_DRIVER</name><value/>
+</macro>
+<macro>
+<name>STM32F401xE</name><value/>
+</macro>
+<macro>
+<name>DEBUG</name><value/>
+</macro>
+
+</language>
+<language name="Object File">
+
+</language>
+</section>
+</cdtprojectproperties>

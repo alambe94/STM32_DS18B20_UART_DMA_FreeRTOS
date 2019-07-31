@@ -36,32 +36,27 @@
 #include "main.h"
 #include "os.h"
 
+
 extern UART_HandleTypeDef huart6;
 #define DS18B20_HALF_DUPLEX_UART huart6
 
 /****ds18b20 thread data*/
 
 #define      DS18B20_TASK_STACK_SIZE 256u
-#define      DS18B20_TASK_PRIORITY   4u
+#define      DS18B20_TASK_PRIORITY   5u
 CPU_STK      DS18B20_Task_Stack[DS18B20_TASK_STACK_SIZE];
 OS_TCB       DS18B20_Task_TCB;
-static void  DS18B20_Task(void* argument);
+static void  DS18B20_Task();
 
 /* only if accessing one wire port from more than one task */
 
-OS_MUTEX     DS18B20_Mutex_Handle;
-
+OS_MUTEX DS18B20_Mutex_Handle;
+OS_Q     DS18B20_Q;
 
 #define QUEUE_LENGTH    1
 #define ITEM_SIZE       sizeof( uint16_t )
 
-/* The variable used to hold the queue's data structure. */
-
-OS_Q DS18B20_Q;
-
-/* The array to use as the queue's storage area.  This must be at least
-uxQueueLength * uxItemSize bytes. */
-uint8_t ucQueueStorageArea[ QUEUE_LENGTH * ITEM_SIZE ];
+CPU_CHAR DS18B20_Q_Storage[ QUEUE_LENGTH * ITEM_SIZE ];
 
 /****ds18b20 thread data*/
 
@@ -270,39 +265,34 @@ static uint8_t DS18B20_Send_Reset(void)
 
 void DS18B20_Thread_Add()
     {
-	OS_ERR  os_err;
 
-	OSMutexCreate((OS_MUTEX*)&DS18B20_Mutex_Handle,
-			      (CPU_CHAR*)"DS18B20_Mutex",
-			      (OS_ERR*	) &os_err);
+    OS_ERR  os_err;
 
-
-	OSQCreate((OS_Q *)&DS18B20_Q,
-				  (CPU_CHAR *)"DS18B20_Q",
-				  (OS_MSG_QTY)1,
-				  (OS_ERR *)&os_err);
+    OSMutexCreate(&DS18B20_Mutex_Handle, "DS18B20_Mutex", &os_err);
 
 
-        OSTaskCreate(&DS18B20_Task_TCB,
-                      "DS18B20_Task",
-		       DS18B20_Task,
-                       0u,
-		       DS18B20_TASK_PRIORITY,
-                       &DS18B20_Task_Stack[0u],
-		       DS18B20_Task_Stack[DS18B20_TASK_STACK_SIZE / 10u],
-		       DS18B20_TASK_STACK_SIZE,
-                       0u,
-                       0u,
-                       0u,
-                       (OS_OPT_TASK_STK_CHK | OS_OPT_TASK_STK_CLR),
-                       &os_err);
+    OSQCreate(&DS18B20_Q, DS18B20_Q_Storage, sizeof(DS18B20_Q_Storage), &os_err);
+
+
+    OSTaskCreate(&DS18B20_Task_TCB,
+                         "DS18B20_Task",
+			 DS18B20_Task,
+                         0u,
+			 DS18B20_TASK_PRIORITY,
+                         &DS18B20_Task_Stack[0u],
+			 DS18B20_Task_Stack[DS18B20_TASK_STACK_SIZE / 10u],
+		         DS18B20_TASK_STACK_SIZE,
+                         0u,
+                         0u,
+                         0u,
+                         (OS_OPT_TASK_STK_CHK | OS_OPT_TASK_STK_CLR),
+                         &os_err);
     }
 
-static void DS18B20_Task(void* argument)
+static void DS18B20_Task()
     {
 
     OS_ERR  os_err;
-    static uint16_t q_data;
 
     DS18B20_GPIO_Init();
     DS18B20_UART_Init();
@@ -311,7 +301,6 @@ static void DS18B20_Task(void* argument)
 
     while (1)
 	{
-
 	/* Sensor detected flag */
 	uint8_t isSensorDetected = 0;
 
@@ -375,15 +364,9 @@ static void DS18B20_Task(void* argument)
 		temperature = DS18B20_Scrach_Pad[0]
 			| DS18B20_Scrach_Pad[1] << 8;
 
-		/* Send temperature. */
+		OSQPost(&DS18B20_Q, &temperature, sizeof(temperature),  OS_OPT_POST_FIFO, &os_err);
 
-		q_data = temperature;
-
-		OSQPost((OS_Q*)&DS18B20_Q,
-				(void*)&q_data,
-				(OS_MSG_SIZE)1,
-				(OS_OPT)OS_OPT_POST_FIFO,
-				(OS_ERR*)&os_err);
+		/* Send temperature.  */
 
 		/* Copying new temperature data and divide by 16 for fraction part */
 		Current_Temperature = (float) temperature / (float) 16;
@@ -417,29 +400,31 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
  * @retval  None
  */
 
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+    {
 
-	if (huart == &DS18B20_HALF_DUPLEX_UART) {
-		OS_ERR os_err;
+    if (huart == &DS18B20_HALF_DUPLEX_UART)
+	{
+        OS_ERR  os_err;
 
-		// Save the CPU registers
-		CPU_SR_ALLOC();
+        // Save the CPU registers
+        CPU_SR_ALLOC();
 
-		// Protect a critical section
-		CPU_CRITICAL_ENTER();
+        // Protect a critical section
+        CPU_CRITICAL_ENTER();
 
-		// Make the kernel aware that
-		// the interrupt has started
-		OSIntEnter();
+        // Make the kernel aware that
+        // the interrupt has started
+        OSIntEnter();
 
-		OSTaskSemPost(&DS18B20_Task_TCB, OS_OPT_POST_NONE, &os_err);
+        OSTaskSemPost(&DS18B20_Task_TCB, OS_OPT_POST_NONE, &os_err);
 
-		CPU_CRITICAL_EXIT();
-		// Handle the interrupt
+        CPU_CRITICAL_EXIT();
+        // Handle the interrupt
 
-		// Make the kernel aware that
-		// the interrupt has ended
-		OSIntExit();
+        // Make the kernel aware that
+        // the interrupt has ended
+        OSIntExit();
 	}
-}
+    }
 

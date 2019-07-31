@@ -26,8 +26,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include  "os.h"
-#include "os_cfg_app.h"
+#include "os.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -37,14 +36,11 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
-//#define TRC_USE_TRACEALYZER_RECORDER 1
-#define  APP_CFG_STARTUP_TASK_PRIO          3u
-#define  APP_CFG_STARTUP_TASK_STK_SIZE    128u
-static   OS_TCB   StartupTaskTCB;
-static   CPU_STK  StartupTaskStk[APP_CFG_STARTUP_TASK_STK_SIZE];
-static   void  StartupTask (void  *p_arg);
-
+#define      STARTUP_TASK_STACK_SIZE 256u
+#define      STARTUP_TASK_PRIORITY   3u
+CPU_STK      Startup_Task_Stack[STARTUP_TASK_STACK_SIZE];
+OS_TCB       Startup_Task_TCB;
+static void  Startup_Task(void  *p_arg);
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -62,30 +58,28 @@ static   void  StartupTask (void  *p_arg);
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
 
+extern void DS18B20_Thread_Add();
+extern void Print_Thread_Add();
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
-extern void DS18B20_Thread_Add();
-extern void Print_Thread_Add();
-static  void  StartupTask (void *p_arg)
-{
+void Startup_Task(void  *p_arg)
+    {
     OS_ERR  os_err;
 
-   (void)p_arg;
+    Print_Thread_Add();
+    DS18B20_Thread_Add();
 
-   DS18B20_Thread_Add();
-   Print_Thread_Add();
 
-    while (DEF_TRUE) {                                          /* Task body, always written as an infinite loop.       */
-        HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
-        OSTimeDlyHMSM(0u, 0u, 0u, 100u,
-                      OS_OPT_TIME_HMSM_STRICT,
-                      &os_err);
+    while(1)
+	{
+	HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
+	OSTimeDly(100, OS_OPT_TIME_DLY, &os_err);
+	}
+
     }
-}
-
 /* USER CODE END 0 */
 
 /**
@@ -126,40 +120,41 @@ int main(void)
   vTraceEnable(TRC_START);
 #endif
 
-  OS_ERR  os_err;
+    OS_ERR  os_err;
 
-  Mem_Init();                                                 /* Initialize Memory Managment Module                   */
-  CPU_IntDis();                                               /* Disable all Interrupts                               */
-  CPU_Init();                                                 /* Initialize the uC/CPU services                       */
+    Mem_Init();                                                 /* Initialize Memory Managment Module                   */
+    CPU_IntDis();                                               /* Disable all Interrupts                               */
+    CPU_Init();                                                 /* Initialize the uC/CPU services                       */
 
-  OSInit(&os_err);                                            /* Initialize uC/OS-III                                 */
-
-  if (os_err != OS_ERR_NONE) {
-          while (1);
-  }
-
-  OSTaskCreate(&StartupTaskTCB,                               /* Create the startup task                              */
-                   "Startup Task",
-                    StartupTask,
-                    0u,
-                    APP_CFG_STARTUP_TASK_PRIO,
-                    &StartupTaskStk[0u],
-                    StartupTaskStk[APP_CFG_STARTUP_TASK_STK_SIZE / 10u],
-                    APP_CFG_STARTUP_TASK_STK_SIZE,
-                    0u,
-                    0u,
-                    0u,
-                    (OS_OPT_TASK_STK_CHK | OS_OPT_TASK_STK_CLR),
-                    &os_err);
+    OSInit(&os_err);                                            /* Initialize uC/OS-III                                 */
     if (os_err != OS_ERR_NONE) {
-          while (1);
-     }
-
-   OSStart(&os_err);                                           /* Start multitasking (i.e. give control to uC/OS-III)  */
-
-   while (DEF_ON) {                                            /* Should Never Get Here.                               */
-
+        while (1);
     }
+
+    OSTaskCreate(&Startup_Task_TCB,                               /* Create the startup task                              */
+                 "Startup Task",
+		  Startup_Task,
+                  0u,
+		  STARTUP_TASK_PRIORITY,
+                  &Startup_Task_Stack[0u],
+		  Startup_Task_Stack[STARTUP_TASK_STACK_SIZE / 10u],
+		  STARTUP_TASK_STACK_SIZE,
+                  0u,
+                  0u,
+                  0u,
+                  (OS_OPT_TASK_STK_CHK | OS_OPT_TASK_STK_CLR),
+                  &os_err);
+    if (os_err != OS_ERR_NONE) {
+        while (1);
+    }
+
+    OSStart(&os_err);                                           /* Start multitasking (i.e. give control to uC/OS-III)  */
+
+    while (DEF_ON) {                                            /* Should Never Get Here.                               */
+        ;
+    }
+
+
 
   /* USER CODE END 2 */
 

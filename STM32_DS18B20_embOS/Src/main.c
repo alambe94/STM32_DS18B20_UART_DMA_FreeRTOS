@@ -40,7 +40,7 @@
 #define          BLINKY_TASK_PRIORITY   3u
 OS_STACKPTR int  Blinky_Task_Stack[BLINKY_TASK_STACK_SIZE];
 OS_TASK          Blinky_Task_TCB;
-static void      Blinky_Task(void* argument);
+static void      Blinky_Task();
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -65,7 +65,7 @@ extern void Print_Thread_Add();
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void Blinky_Task(void* argument)
+void Blinky_Task()
     {
 
     while(1)
@@ -112,6 +112,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   __disable_irq();
+  HAL_NVIC_SetPriority(SysTick_IRQn, 15, 0U);
 
   OS_Init();    // Initialize embOS
   OS_InitHW();  // Initialize required hardware
@@ -179,6 +180,27 @@ void SystemClock_Config(void)
 /* USER CODE BEGIN 4 */
 
 /* USER CODE END 4 */
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM10 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM10) {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+
+  /* USER CODE END Callback 1 */
+}
 
 /**
   * @brief  This function is executed in case of error occurrence.

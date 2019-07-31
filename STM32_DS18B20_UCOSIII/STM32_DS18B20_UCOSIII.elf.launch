@@ -16,7 +16,7 @@
 <booleanAttribute key="com.st.stm32cube.ide.mcu.debug.stlink.enable_logging" value="false"/>
 <booleanAttribute key="com.st.stm32cube.ide.mcu.debug.stlink.enable_shared_stlink" value="false"/>
 <stringAttribute key="com.st.stm32cube.ide.mcu.debug.stlink.external_loader" value=""/>
-<stringAttribute key="com.st.stm32cube.ide.mcu.debug.stlink.log_file" value="/home/medprime/Documents/Projects/alsaad/Cube/WorkSpace/STM32_DS18B20_UCOSIII/Debug/st-link_gdbserver_log.txt"/>
+<stringAttribute key="com.st.stm32cube.ide.mcu.debug.stlink.log_file" value="/home/medprime/Documents/Projects/alsaad/Cube/WorkSpace/STM32_DS18B20_UART_DMA_RTOS/STM32_DS18B20_UCOSIII/Debug/st-link_gdbserver_log.txt"/>
 <stringAttribute key="com.st.stm32cube.ide.mcu.debug.stlink.stlink_ap_id" value="0"/>
 <booleanAttribute key="com.st.stm32cube.ide.mcu.debug.stlink.stlink_check_serial_number" value="false"/>
 <stringAttribute key="com.st.stm32cube.ide.mcu.debug.stlink.stlink_txt_serial_number" value=""/>

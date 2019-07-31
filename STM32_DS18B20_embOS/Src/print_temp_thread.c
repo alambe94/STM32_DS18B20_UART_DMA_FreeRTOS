@@ -7,19 +7,21 @@
 
 #include "main.h"
 #include "RTOS.h"
-#include "printf.h"
 #include "stdlib.h"
 #include "string.h"
+#include "printf.h"
 
-#define              PRINT_TASK_STACK_SIZE 256u
-#define              PRINT_TASK_PRIORITY   5u
-OS_STACKPTR int      Print_Task_Stack[PRINT_TASK_STACK_SIZE];
-OS_TASK              Print_Task_TCB;
-static void          Print_Task();
 
-OS_MUTEX UART_Mutex_Handle;
+#define          PRINT_TASK_STACK_SIZE 256u
+#define          PRINT_TASK_PRIORITY   4u
+OS_STACKPTR int  Print_Task_Stack[PRINT_TASK_STACK_SIZE];
+OS_TASK          Print_Task_TCB;
+static void      Print_Task();
 
-extern OS_Q DS18B20_Q;
+OS_MUTEX         UART_Mutex_Handle;
+
+extern OS_QUEUE  DS18B20_Q;
+
 
 extern UART_HandleTypeDef huart2;
 UART_HandleTypeDef* CLI_UART = &huart2;
@@ -29,7 +31,7 @@ void Print_Thread_Add()
 
     OS_MUTEX_Create(&UART_Mutex_Handle);
 
-    OS_TASK_CREATE(&Print_Task_TCB, "Print_Task", 100, Print_Task, Print_Task_Stack);
+    OS_TASK_CREATE(&Print_Task_TCB, "Print_Task", 80, Print_Task, Print_Task_Stack);
 
     }
 
@@ -46,6 +48,7 @@ void CLI_UART_Send_String(const char* data)
 
     /*** gaurd uart ***/
     OS_MUTEX_LockBlocked(&UART_Mutex_Handle);
+
     uint16_t count = 0;
     while (*data)
 	{
@@ -55,7 +58,6 @@ void CLI_UART_Send_String(const char* data)
 
     /*** release uart ***/
     OS_MUTEX_Unlock(&UART_Mutex_Handle);
-
     }
 
 void CLI_UART_Send_String_DMA(const char* data)
@@ -96,16 +98,21 @@ void CLI_UART_Send_Float(float num)
 static void Print_Task()
     {
 
-    uint16_t* pData;
+    uint16_t* q_data = NULL;
     float temperature = 0.0;
 
     while (1)
 	{
-	 OS_QUEUE_GetPtrBlocked(&DS18B20_Q, (void**)&pData);
-	 temperature = (float)(*pData)/16;
-	 CLI_UART_Send_Float(10.2);
-	 CLI_UART_Send_String("\r\n");
 
+	OS_QUEUE_GetPtrBlocked(&DS18B20_Q, (void**) &q_data);
+
+	if (q_data != NULL)
+	    {
+	    temperature = (float) *q_data / (float) 16;
+	    CLI_UART_Send_Float(temperature);
+	    CLI_UART_Send_String("\r\n");
+	    }
+	OS_QUEUE_Purge(&DS18B20_Q);
 	}
 
     }

@@ -7,19 +7,21 @@
 
 #include "main.h"
 #include "os.h"
-#include "printf.h"
 #include "stdlib.h"
 #include "string.h"
+#include "printf.h"
+
 
 #define      PRINT_TASK_STACK_SIZE 256u
-#define      PRINT_TASK_PRIORITY   5u
+#define      PRINT_TASK_PRIORITY   4u
 CPU_STK      Print_Task_Stack[PRINT_TASK_STACK_SIZE];
 OS_TCB       Print_Task_TCB;
 static void  Print_Task(void* argument);
 
-OS_MUTEX UART_Mutex_Handle;
+OS_MUTEX     UART_Mutex_Handle;
 
-extern OS_Q DS18B20_Q;
+extern OS_Q  DS18B20_Q;
+
 
 extern UART_HandleTypeDef huart2;
 UART_HandleTypeDef* CLI_UART = &huart2;
@@ -27,25 +29,26 @@ UART_HandleTypeDef* CLI_UART = &huart2;
 void Print_Thread_Add()
     {
 
-    OS_ERR os_err;
-/*
-    OSMutexCreate((OS_MUTEX*) &UART_Mutex_Handle,
-	    (CPU_CHAR*) "UART_Mutex",
-	    (OS_ERR*) &os_err);
-*/
+    OS_ERR  os_err;
+
+    OSMutexCreate((OS_MUTEX*)&UART_Mutex_Handle,
+    		  (CPU_CHAR*)"UART_Mutex",
+    		  (OS_ERR*	) &os_err);
+
     OSTaskCreate(&Print_Task_TCB,
-	    "Print_Task",
-	    Print_Task,
-	    0u,
-            PRINT_TASK_PRIORITY,
-	    &Print_Task_Stack[0u],
-	    Print_Task_Stack[PRINT_TASK_STACK_SIZE / 10u],
-	    PRINT_TASK_STACK_SIZE,
-	    0u,
-	    0u,
-	    0u,
-	    (OS_OPT_TASK_STK_CHK | OS_OPT_TASK_STK_CLR ),
-	    &os_err);
+                      "Print_Task",
+		      Print_Task,
+                      0u,
+		      PRINT_TASK_PRIORITY,
+                      &Print_Task_Stack[0u],
+		      Print_Task_Stack[PRINT_TASK_STACK_SIZE / 10u],
+		      PRINT_TASK_STACK_SIZE,
+                      0u,
+                      0u,
+                      0u,
+                      (OS_OPT_TASK_STK_CHK | OS_OPT_TASK_STK_CLR),
+                      &os_err);
+
     }
 
 void CLI_UART_Send_Char(const char data)
@@ -59,10 +62,10 @@ void CLI_UART_Send_Char(const char data)
 void CLI_UART_Send_String(const char* data)
     {
 
-    OS_ERR os_err;
+    OS_ERR  os_err;
 
     /*** gaurd uart ***/
-    //OSMutexPend(&UART_Mutex_Handle, 0, OS_OPT_PEND_BLOCKING, 0, &os_err);
+    OSMutexPend(&UART_Mutex_Handle, 0, OS_OPT_PEND_BLOCKING, 0, &os_err);
 
     uint16_t count = 0;
     while (*data)
@@ -72,13 +75,14 @@ void CLI_UART_Send_String(const char* data)
 	}
 
     /*** release uart ***/
-    //OSMutexPost(&UART_Mutex_Handle, OS_OPT_POST_NONE, &os_err);
+    OSMutexPost(&UART_Mutex_Handle, OS_OPT_POST_NONE, &os_err);
+
     }
 
 void CLI_UART_Send_String_DMA(const char* data)
     {
 
-    OS_ERR os_err;
+    OS_ERR  os_err;
 
     /*** gaurd uart ***/
     OSMutexPend(&UART_Mutex_Handle, 0, OS_OPT_PEND_BLOCKING, 0, &os_err);
@@ -116,23 +120,25 @@ static void Print_Task(void* argument)
     {
 
     OS_ERR os_err;
+    uint16_t* q_data = 0;
+    float temperature = 0.0;
     OS_MSG_SIZE msg_size;
-    float temperature = 0;
-    uint16_t* temperature_ptr;
+    CPU_TS ts;
 
     while (1)
 	{
-/*
-	temperature_ptr = OSQPend((OS_Q*) &DS18B20_Q,
-		(OS_TICK) 0,
-		(OS_OPT) OS_OPT_PEND_BLOCKING,
-		(OS_MSG_SIZE*) &msg_size,
-		(CPU_TS*) 0, (OS_ERR*) &os_err);
 
-	 temperature = ((float) *temperature_ptr / (float) 16);
-*/
-	 CLI_UART_Send_Float(temperature);
-	 CLI_UART_Send_String("\r\n");
+	//check if valid temperature is received from ds18b20 task within one second
+
+	q_data = OSQPend(&DS18B20_Q, 1000, OS_OPT_PEND_BLOCKING, &msg_size, &ts,
+		&os_err);
+
+	if (q_data != NULL)
+	    {
+	    temperature = (float) *q_data / (float) 16;
+	    CLI_UART_Send_Float(temperature);
+	    CLI_UART_Send_String("\r\n");
+	    }
 
 	}
 

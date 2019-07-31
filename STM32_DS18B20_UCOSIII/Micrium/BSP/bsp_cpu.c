@@ -1,38 +1,44 @@
 /*
 *********************************************************************************************************
-*                                     MICIRUM BOARD SUPPORT PACKAGE
+*                                            EXAMPLE CODE
 *
-*                             (c) Copyright 2013; Micrium, Inc.; Weston, FL
+*               This file is provided as an example on how to use Micrium products.
 *
-*               All rights reserved.  Protected by international copyright laws.
-*               Knowledge of the source code may NOT be used to develop a similar product.
+*               Please feel free to use any application code labeled as 'EXAMPLE CODE' in
+*               your application products.  Example code may be used as is, in whole or in
+*               part, or may be used as a reference only. This file can be modified as
+*               required to meet the end-product requirements.
+*
 *               Please help us continue to provide the Embedded community with the finest
 *               software available.  Your honesty is greatly appreciated.
+*
+*               You can find our product's user manual, API reference, release notes and
+*               more information at https://doc.micrium.com.
+*               You can contact us at www.micrium.com.
 *********************************************************************************************************
 */
 
 /*
 *********************************************************************************************************
 *
-*                                     BOARD SUPPORT PACKAGE (BSP)
+*                               CPU BOARD SUPPORT PACKAGE (BSP) FUNCTIONS
 *
-* Filename      : bsp.c
-* Version       : V1.00
-* Programmer(s) : FF
-*                 YS
+*                                            ARM-CORTEX-M4
+*
+* Filename : bsp_cpu.c
 *********************************************************************************************************
 */
 
 
 /*
 *********************************************************************************************************
-*                                             INCLUDE FILES
+*                                            INCLUDE FILES
 *********************************************************************************************************
 */
 
-#define   BSP_MODULE
-#include  <bsp.h>
-#include  <os.h>
+#define    CPU_BSP_MODULE
+#include  <cpu_core.h>
+#include  "bsp_clk.h"
 
 
 /*
@@ -40,6 +46,12 @@
 *                                            LOCAL DEFINES
 *********************************************************************************************************
 */
+
+#define  CPU_BSP_REG_DEMCR             (*(CPU_REG32 *)(0xE000EDFCu))
+#define  CPU_BSP_REG_DWT_CR            (*(CPU_REG32 *)(0xE0001000u))
+#define  CPU_BSP_REG_DWT_CYCCNT        (*(CPU_REG32 *)(0xE0001004u))
+#define  CPU_BSP_REG_DWT_LAR           (*(CPU_REG32 *)(0xE0001FB0u))
+#define  CPU_BSP_REG_DWT_LSR           (*(CPU_REG32 *)(0xE0001FB4u))
 
 
 /*
@@ -72,31 +84,6 @@
 
 /*
 *********************************************************************************************************
-*                                             REGISTERS
-*********************************************************************************************************
-*/
-
-#define  BSP_REG_DEM_CR                           (*(CPU_REG32 *)0xE000EDFC)
-#define  BSP_REG_DWT_CR                           (*(CPU_REG32 *)0xE0001000)
-#define  BSP_REG_DWT_CYCCNT                       (*(CPU_REG32 *)0xE0001004)
-#define  BSP_REG_DBGMCU_CR                        (*(CPU_REG32 *)0xE0042004)
-
-
-
-
-/*
-*********************************************************************************************************
-*                                            REGISTER BITS
-*********************************************************************************************************
-*/
-
-
-#define  BSP_BIT_DEM_CR_TRCENA                    DEF_BIT_24
-#define  BSP_BIT_DWT_CR_CYCCNTENA                 DEF_BIT_00
-
-
-/*
-*********************************************************************************************************
 *                                      LOCAL FUNCTION PROTOTYPES
 *********************************************************************************************************
 */
@@ -104,27 +91,11 @@
 
 /*
 *********************************************************************************************************
-*                                            BSP_CPU_ClkFreq()
-*
-* Description : Read CPU registers to determine the CPU clock frequency of the chip.
-*
-* Argument(s) : none.
-*
-* Return(s)   : The CPU clock frequency, in Hz.
-*
-* Caller(s)   : Application.
-*
-* Note(s)     : none.
+*                                     LOCAL CONFIGURATION ERRORS
 *********************************************************************************************************
 */
 
-CPU_INT32U  BSP_CPU_ClkFreq (void)
-{
-    return HAL_RCC_GetSysClockFreq();
-}
 
-
-/*$PAGE*/
 /*
 *********************************************************************************************************
 *                                          CPU_TS_TmrInit()
@@ -183,18 +154,17 @@ void  CPU_TS_TmrInit (void)
     CPU_INT32U  fclk_freq;
 
 
-    fclk_freq = BSP_CPU_ClkFreq();
+    fclk_freq = BSP_ClkFreqGet(CLK_ID_HCLK);
 
-    BSP_REG_DEM_CR     |= (CPU_INT32U)BSP_BIT_DEM_CR_TRCENA;    /* Enable Cortex-M4's DWT CYCCNT reg.                   */
-    BSP_REG_DWT_CYCCNT  = (CPU_INT32U)0u;
-    BSP_REG_DWT_CR     |= (CPU_INT32U)BSP_BIT_DWT_CR_CYCCNTENA;
+    CPU_BSP_REG_DEMCR      |= DEF_BIT_24;          /* Set DEM_CR_TRCENA                                */
+    CPU_BSP_REG_DWT_CYCCNT  = 0u;
+    CPU_BSP_REG_DWT_CR     |= DEF_BIT_00;          /* Set DWT_CR_CYCCNTENA                             */
 
     CPU_TS_TmrFreqSet((CPU_TS_TMR_FREQ)fclk_freq);
 }
 #endif
 
 
-/*$PAGE*/
 /*
 *********************************************************************************************************
 *                                           CPU_TS_TmrRd()
@@ -283,14 +253,13 @@ CPU_TS_TMR  CPU_TS_TmrRd (void)
     CPU_TS_TMR  ts_tmr_cnts;
 
 
-    ts_tmr_cnts = (CPU_TS_TMR)BSP_REG_DWT_CYCCNT;
+    ts_tmr_cnts = (CPU_TS_TMR)CPU_BSP_REG_DWT_CYCCNT;         /* Read the timer count register        */
 
     return (ts_tmr_cnts);
 }
 #endif
 
 
-/*$PAGE*/
 /*
 *********************************************************************************************************
 *                                         CPU_TSxx_to_uSec()
@@ -354,7 +323,7 @@ CPU_INT64U  CPU_TS32_to_uSec (CPU_TS32  ts_cnts)
     CPU_INT64U  fclk_freq;
 
 
-    fclk_freq = BSP_CPU_ClkFreq();
+    fclk_freq = BSP_ClkFreqGet(CLK_ID_HCLK);
     ts_us     = ts_cnts / (fclk_freq / DEF_TIME_NBR_uS_PER_SEC);
 
     return (ts_us);
@@ -369,7 +338,7 @@ CPU_INT64U  CPU_TS64_to_uSec (CPU_TS64  ts_cnts)
     CPU_INT64U  fclk_freq;
 
 
-    fclk_freq = BSP_CPU_ClkFreq();
+    fclk_freq = BSP_ClkFreqGet(CLK_ID_HCLK);
     ts_us     = ts_cnts / (fclk_freq / DEF_TIME_NBR_uS_PER_SEC);
 
     return (ts_us);

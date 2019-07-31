@@ -271,7 +271,7 @@ void DS18B20_Thread_Add()
 
     OS_MUTEX_Create(&DS18B20_Mutex);
 
-    OS_SEMAPHORE_Create(&DS18B20_SYN_SEM, 1);
+    OS_SEMAPHORE_Create(&DS18B20_SYN_SEM, 0);
 
     OS_TASK_CREATE(&DS18B20_Task_TCB, "DS18B20_Task", 100, DS18B20_Task, DS18B20_Task_Stack);
     }

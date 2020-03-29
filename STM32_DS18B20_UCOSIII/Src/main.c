@@ -28,7 +28,7 @@
 /* USER CODE BEGIN Includes */
 #include "os.h"
 #include "lib_mem.h"
-#include "bsp_os.h"
+#include "bsp.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -70,9 +70,6 @@ extern void Print_Thread_Add();
 void Startup_Task(void  *p_arg)
     {
     OS_ERR  os_err;
-
-    BSP_OS_TickEnable();                                        /* Enable the tick timer and interrupt                  */
-
 
     Print_Thread_Add();
     DS18B20_Thread_Add();
@@ -127,7 +124,6 @@ int main(void)
 
     OS_ERR  os_err;
 
-    BSP_OS_TickInit();
     Mem_Init();                                                 /* Initialize Memory Managment Module                   */
     CPU_IntDis();                                               /* Disable all Interrupts                               */
     CPU_Init();                                                 /* Initialize the uC/CPU services                       */

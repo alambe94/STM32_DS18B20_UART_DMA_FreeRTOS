@@ -39,17 +39,17 @@
 #define OS_CFG_APP_HOOKS_EN             DEF_ENABLED             /* Enable (DEF_ENABLED) application specific hooks                       */
 #define OS_CFG_ARG_CHK_EN               DEF_ENABLED             /* Enable (DEF_ENABLED) argument checking                                */
 #define OS_CFG_CALLED_FROM_ISR_CHK_EN   DEF_ENABLED             /* Enable (DEF_ENABLED) check for called from ISR                        */
-#define OS_CFG_DBG_EN                   DEF_ENABLED             /* Enable (DEF_ENABLED) debug code/variables                             */
-#define OS_CFG_TICK_EN                  DEF_ENABLED             /* Enable (DEF_ENABLED) the kernel tick                                  */
-#define OS_CFG_DYN_TICK_EN              DEF_DISABLED             /* Enable (DEF_ENABLED) the Dynamic Tick                                 */
+#define OS_CFG_DBG_EN                   DEF_DISABLED            /* Enable (DEF_ENABLED) debug code/variables                             */
+#define OS_CFG_TICK_EN                  DEF_ENABLED             /* Enable (DEF_ENABLED) the kernel tick                                 */
+#define OS_CFG_DYN_TICK_EN              DEF_DISABLED            /* Enable (DEF_ENABLED) the Dynamic Tick                                 */
 #define OS_CFG_INVALID_OS_CALLS_CHK_EN  DEF_ENABLED             /* Enable (DEF_ENABLED) checks for invalid kernel calls                  */
 #define OS_CFG_OBJ_TYPE_CHK_EN          DEF_ENABLED             /* Enable (DEF_ENABLED) object type checking                             */
-#define OS_CFG_TS_EN                    DEF_ENABLED             /* Enable (DEF_ENABLED) time stamping                                    */
+#define OS_CFG_TS_EN                    DEF_DISABLED            /* Enable (DEF_ENABLED) time stamping                                    */
 
 #define OS_CFG_PRIO_MAX                 64u                     /* Defines the maximum number of task priorities (see OS_PRIO data type) */
 
 #define OS_CFG_SCHED_LOCK_TIME_MEAS_EN  DEF_DISABLED            /* Include (DEF_ENABLED) code to measure scheduler lock time             */
-#define OS_CFG_SCHED_ROUND_ROBIN_EN     DEF_DISABLED            /* Include (DEF_ENABLED) code for Round-Robin scheduling                 */
+#define OS_CFG_SCHED_ROUND_ROBIN_EN     DEF_ENABLED             /* Include (DEF_ENABLED) code for Round-Robin scheduling                 */
 
 #define OS_CFG_STK_SIZE_MIN             64u                     /* Minimum allowable task stack size                                     */
 
@@ -97,7 +97,7 @@
 #define OS_CFG_TASK_Q_PEND_ABORT_EN     DEF_ENABLED             /* Include (DEF_ENABLED) code for OSTaskQPendAbort()                     */
 #define OS_CFG_TASK_REG_TBL_SIZE        1u                      /* Number of task specific registers                                     */
 #define OS_CFG_TASK_STK_REDZONE_EN      DEF_DISABLED            /* Enable (DEF_ENABLED) stack redzone                                    */
-#define OS_CFG_TASK_STK_REDZONE_DEPTH   8u                      /* Depth of the stack redzone                                            */
+#define OS_CFG_TASK_STK_REDZONE_DEPTH   8u                      /* Depth of the stack redzone                                        */
 #define OS_CFG_TASK_SEM_PEND_ABORT_EN   DEF_ENABLED             /* Include (DEF_ENABLED) code for OSTaskSemPendAbort()                   */
 #define OS_CFG_TASK_SUSPEND_EN          DEF_ENABLED             /* Include (DEF_ENABLED) code for OSTaskSuspend() and OSTaskResume()     */
 
